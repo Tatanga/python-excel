@@ -1,37 +1,59 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-fix_encoding = lambda s: s.decode('utf8')
 
 import xlwt
-import   MySQLdb
-wbk=xlwt.Workbook()
+import MySQLdb
 
-sheet=wbk.add_sheet('sheet 1')
+class MysqlExport(object):
+    def __init__(self):
+        self.wbk = xlwt.Workbook()
+        self.sheet = self.wbk.add_sheet('sheet 1')
+        self.__table = ''
+        self.__fields = []
 
-sheet.write(0,0,'galore_name')
-sheet.write(0,1,'username')
-sheet.write(0,2,'tel')
-sheet.write(0,3,'addr')
-sheet.write(0,4,'create_at')
+    @property
+    def table(self):
+        return self.__table
 
-conn=MySQLdb.connect(host='127.0.0.1',user='root',passwd='',db='mydb1', charset='utf8')
+    @table.setter
+    def table(self, table):
+        self.__table = table
 
-cursor=conn.cursor()
-cursor.execute('select galore_name,name,mobile,addr,create_at from cash_event')
+    @property
+    def fields(self):
+        return self.__fields
 
-row=1
-#for galore_name,username,tel,addr,create_at in cursor.fetchall():
-for galore_name,username,tel,addr,create_at in cursor.fetchall():
-    sheet.write(row, 0, fix_encoding(galore_name))
-    sheet.write(row, 1, fix_encoding(username))
-    sheet.write(row, 2, fix_encoding(tel))
-    sheet.write(row, 3, fix_encoding(addr))
-    sheet.write(row, 4, create_at)
-    print row
-    row+=1
+    @fields.setter
+    def fields(self, fields):
+        if not isinstance(fields, list):
+            raise TypeError('fields is not a list')
+        self.__fields = fields
 
-wbk.save(u'cash.xls')
-cursor.close()
-conn.commit()
-conn.close()
+   def export_heads(self):
+        for index, head in enumerate(self.fields):
+            self.sheet.write(0, index, head)
+
+    def execute_hql(self, hql):
+        try:
+            conn = MySQLdb.connect(host='127.0.0.1', user='root', passwd='', db='mydb1', charset='utf8')
+            cursor = conn.cursor()
+            cursor.execute(hql)
+
+            row = 0
+            for self.fields in cursor.fetchall():
+                for index, field in enumerate(self.fields):
+                    self.sheet.write(row, index, field.decode('utf8'))
+                row += 1
+        finally:
+            self.wbk.save(u'examples.xls')
+            cursor.close()
+            conn.close()
+
+    def export_data(self):
+        try:
+            hql = 'select %s from %s' % (','.join(self.fields), self.table)
+            self.execute_hql(hql)
+        except Exception, e:
+            print e
+            raise e
